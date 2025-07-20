@@ -1,0 +1,27 @@
+exception_codes = {
+    "35": "Extra Platform Assign.",
+    "36": "Extra Drill/Switch",
+    "38": "Reinstruction",
+    "39": "No Lunch",
+    "39S": "No Lunch (Reimb.)",
+    "40": "Late Clear",
+    "40S": "Late Clear (Reimb.)",
+    "42W": "Written Rpt/Time Spent",
+    "46": "Extra Board",
+    "46B": "Split Tour Bonus",
+    "47": "Worked Second Tour",
+    "48": "Worked RDO",
+    "49": "Travel Time/Deadhead",
+    "50": "Breaking in Student",
+    "51": "Extra Trip",
+    "52": "Extra Flagging",
+    "57": "Waiting Time",
+    "58": "Early Report",
+    "59": "Radio Allowance",
+    "543": "Early Report (G.O.)",
+    "741": "Early Rpt-Cold Weather",
+    "841": "Late Clear-Cold Weather",
+    "941": "Emergency Snow Work",
+    "943": "Late Clear (G.O.)"
+    # ...add more as needed
+}

@@ -6,6 +6,9 @@ from db import init_db, add_user, check_user
 import pytesseract
 import cv2
 from PIL import Image
+import re
+from db import init_exception_form_db, store_exception_form
+from exception_codes import exception_codes
 
 app = Flask(__name__)
 CORS(app)
@@ -62,6 +65,72 @@ def login():
         return jsonify({"message": "Login successful!"}), 200
     print("Login failed")
     return jsonify({"error": "Invalid credentials"}), 401
+
+def parse_exception_form(ocr_lines):
+    # This is a simplified parser. You may need to adjust regexes for your OCR output.
+    form_data = {
+        'pass_number': '',
+        'title': '',
+        'employee_name': '',
+        'rdos': '',
+        'actual_ot_date': '',
+        'div': '',
+        'comments': '',
+        'supervisor_name': '',
+        'supervisor_pass_no': '',
+        'oto': '',
+        'oto_amount_saved': '',
+        'entered_in_uts': ''
+    }
+    rows = []
+
+    # Example: parse header fields
+    for line in ocr_lines:
+        if "Pass Number" in line:
+            form_data['pass_number'] = line.split()[-1]
+        elif "Title" in line:
+            form_data['title'] = line.split()[-1]
+        elif "Employee Name" in line:
+            form_data['employee_name'] = line.split(":")[-1].strip()
+        # ...repeat for other fields
+
+    # Example: parse table rows (very basic, you may need to improve this)
+    table_start = False
+    for line in ocr_lines:
+        if re.match(r'\d{2,4}', line.strip().split()[0]):  # If line starts with a code
+            table_start = True
+        if table_start:
+            parts = line.split()
+            if len(parts) >= 10:  # crude check for a table row
+                code = parts[0]
+                code_description = exception_codes.get(code, "")
+                row = {
+                    'code': code,
+                    'code_description': code_description,
+                    'line_location': parts[1],
+                    'run_no': parts[2],
+                    'exception_time_from_hh': parts[3],
+                    'exception_time_from_mm': parts[4],
+                    'exception_time_to_hh': parts[5],
+                    'exception_time_to_mm': parts[6],
+                    'overtime_hh': parts[7],
+                    'overtime_mm': parts[8],
+                    'bonus_hh': parts[9],
+                    'bonus_mm': parts[10],
+                    'nite_diff_hh': parts[11] if len(parts) > 11 else '',
+                    'nite_diff_mm': parts[12] if len(parts) > 12 else '',
+                    'ta_job_no': parts[13] if len(parts) > 13 else ''
+                }
+                rows.append(row)
+    return form_data, rows
+
+# Example usage after OCR:
+ocr_lines = [
+    # ...lines from your OCR output...
+]
+init_exception_form_db()
+form_data, rows = parse_exception_form(ocr_lines)
+store_exception_form(form_data, rows)
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
