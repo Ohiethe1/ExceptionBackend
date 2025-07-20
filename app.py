@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from model import train_model
 from db import init_db, add_user, check_user
@@ -9,6 +9,7 @@ from PIL import Image
 import re
 from db import init_exception_form_db, store_exception_form
 from exception_codes import exception_codes
+import sqlite3
 
 app = Flask(__name__)
 CORS(app)
@@ -65,6 +66,29 @@ def login():
         return jsonify({"message": "Login successful!"}), 200
     print("Login failed")
     return jsonify({"error": "Invalid credentials"}), 401
+
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    conn = sqlite3.connect('forms.db')
+    c = conn.cursor()
+    # Sum overtime (convert HH:MM to minutes, then back to HH:MM)
+    c.execute('SELECT overtime_hh, overtime_mm FROM exception_form_rows')
+    total_minutes = 0
+    for hh, mm in c.fetchall():
+        try:
+            total_minutes += int(hh or 0) * 60 + int(mm or 0)
+        except Exception:
+            continue
+    total_overtime_hh = total_minutes // 60
+    total_overtime_mm = total_minutes % 60
+    # Count unique TA job numbers (non-empty)
+    c.execute('SELECT COUNT(DISTINCT ta_job_no) FROM exception_form_rows WHERE ta_job_no != ""')
+    total_job_numbers = c.fetchone()[0]
+    conn.close()
+    return jsonify({
+        'total_overtime': f"{total_overtime_hh:02d}:{total_overtime_mm:02d}",
+        'total_job_numbers': total_job_numbers
+    })
 
 def parse_exception_form(ocr_lines):
     # This is a simplified parser. You may need to adjust regexes for your OCR output.
@@ -132,5 +156,33 @@ init_exception_form_db()
 form_data, rows = parse_exception_form(ocr_lines)
 store_exception_form(form_data, rows)
 
+def init_audit_db():
+    conn = sqlite3.connect('forms.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS audit_trail (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            action TEXT,
+            target_type TEXT,
+            target_id INTEGER,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            details TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def log_audit(username, action, target_type, target_id, details=""):
+    conn = sqlite3.connect('forms.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO audit_trail (username, action, target_type, target_id, details)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (username, action, target_type, target_id, details))
+    conn.commit()
+    conn.close()
+
 if __name__ == "__main__":
+    init_audit_db()
     app.run(port=5000, debug=True)

@@ -188,3 +188,30 @@ def store_exception_form(form_data, rows):
         ))
     conn.commit()
     conn.close()
+
+def init_audit_db():
+    conn = sqlite3.connect('forms.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS audit_trail (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            action TEXT,
+            target_type TEXT,
+            target_id INTEGER,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            details TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def log_audit(username, action, target_type, target_id, details=""):
+    conn = sqlite3.connect('forms.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO audit_trail (username, action, target_type, target_id, details)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (username, action, target_type, target_id, details))
+    conn.commit()
+    conn.close()
